@@ -7,7 +7,7 @@ from telegram.ext import (
     CallbackQueryHandler, ContextTypes, ConversationHandler, filters
 )
 
-TOKEN = "8911018421:AAE9KebICOGpbR8uYnsksE18b2I5bFo1Nsc"
+
 DATA_FILE = "data.json"
 
 logging.basicConfig(level=logging.INFO)
