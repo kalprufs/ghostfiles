@@ -1,472 +1,727 @@
-import os
-import json
-import logging
-from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, ConversationHandler, filters
-)
-
-TOKEN = os.environ.get("BOT_TOKEN", "YOUR_TOKEN_HERE")
-DATA_FILE = "data.json"
-
-logging.basicConfig(level=logging.INFO)
-
-# Conversation states
-NAME, DESCRIPTION, REASON, ICKS, PHOTO = range(5)
-ADD_ICK_NAME, ADD_ICK_TEXT = range(5, 7)
-EDIT_SELECT, EDIT_FIELD, EDIT_VALUE, EDIT_PHOTO = range(7, 11)
-
-MAIN_KEYBOARD = ReplyKeyboardMarkup(
-    [
-        [KeyboardButton("🗂️ Add a Guy"), KeyboardButton("👀 My List")],
-        [KeyboardButton("🔍 Look Up"), KeyboardButton("🤢 Add an Ick")],
-        [KeyboardButton("✏️ Edit"), KeyboardButton("🗑️ Delete")],
-        [KeyboardButton("❓ Help")],
-    ],
-    resize_keyboard=True,
-    is_persistent=True
-)
-
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return {}
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-# ── /start ────────────────────────────────────────────────────────────────────
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👻 Welcome to GhostFileBot!\n\n"
-        "Your personal vault for remembering why you said no.\n\n"
-        "Use the buttons below to get started 👇",
-        reply_markup=MAIN_KEYBOARD
-    )
-
-async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👻 GhostFileBot Help\n\n"
-        "🗂️ Add a Guy — file a new guy\n"
-        "👀 My List — see everyone you've filed\n"
-        "🔍 Look Up — open a specific guy's file\n"
-        "🤢 Add an Ick — add an ick to someone's file\n"
-        "✏️ Edit — edit someone's file\n"
-        "🗑️ Delete — remove someone from the file",
-        reply_markup=MAIN_KEYBOARD
-    )
-
-# ── Add flow ──────────────────────────────────────────────────────────────────
-
-async def add_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Let's file him 🗂️\n\nWhat's his name?")
-    return NAME
-
-async def add_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["new_name"] = update.message.text.strip()
-    await update.message.reply_text("Short description — who is he? (e.g. 'guy from the gym', 'ex from 2022')")
-    return DESCRIPTION
-
-async def add_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["new_desc"] = update.message.text.strip()
-    await update.message.reply_text("Why did you say no?")
-    return REASON
-
-async def add_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["new_reason"] = update.message.text.strip()
-    context.user_data["new_icks"] = []
-    await update.message.reply_text(
-        "Any icks? Send them one by one, then tap Done.\nOr tap Skip.",
-        reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("✅ Done"), KeyboardButton("⏭️ Skip")]],
-            resize_keyboard=True
-        )
-    )
-    return ICKS
-
-async def add_ick_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text == "✅ Done":
-        return await add_icks_done(update, context)
-    if text == "⏭️ Skip":
-        return await skip_icks(update, context)
-    context.user_data["new_icks"].append(text)
-    await update.message.reply_text(
-        "Added! 🤢 Send another ick or tap Done.",
-        reply_markup=ReplyKeyboardMarkup(
-            [[KeyboardButton("✅ Done"), KeyboardButton("⏭️ Skip")]],
-            resize_keyboard=True
-        )
-    )
-    return ICKS
-
-async def add_icks_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Got it! Now send a photo or screenshot.\nOr tap Skip.",
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("⏭️ Skip")]], resize_keyboard=True)
-    )
-    return PHOTO
-
-async def skip_icks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["new_icks"] = []
-    await update.message.reply_text(
-        "Now send a photo or screenshot.\nOr tap Skip.",
-        reply_markup=ReplyKeyboardMarkup([[KeyboardButton("⏭️ Skip")]], resize_keyboard=True)
-    )
-    return PHOTO
-
-async def add_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["new_photo"] = update.message.photo[-1].file_id
-    await _save_entry(update, context)
-    return ConversationHandler.END
-
-async def skip_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["new_photo"] = None
-    await _save_entry(update, context)
-    return ConversationHandler.END
-
-async def _save_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    name = context.user_data["new_name"]
-    data = load_data()
-    if user_id not in data:
-        data[user_id] = {}
-    data[user_id][name.lower()] = {
-        "name": name,
-        "description": context.user_data["new_desc"],
-        "reason": context.user_data["new_reason"],
-        "icks": context.user_data.get("new_icks", []),
-        "photo": context.user_data.get("new_photo"),
-        "date": datetime.now().strftime("%B %d, %Y")
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GhostFileBot</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👻</text></svg>" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0e0e12;
+      --surface: #17171e;
+      --surface2: #1f1f2a;
+      --border: #2a2a38;
+      --accent: #b388ff;
+      --accent2: #7c4dff;
+      --danger: #ff5c7a;
+      --text: #f0eeff;
+      --muted: #7b7a94;
+      --ick: #ff9f43;
     }
-    save_data(data)
-    await update.message.reply_text(
-        f"✅ {name} has been filed. If he ever comes back, you'll know exactly why you said no 👻",
-        reply_markup=MAIN_KEYBOARD
-    )
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Cancelled. Nothing was saved.", reply_markup=MAIN_KEYBOARD)
-    return ConversationHandler.END
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-# ── List ──────────────────────────────────────────────────────────────────────
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-async def list_entries(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    data = load_data()
-    entries = data.get(user_id, {})
-    if not entries:
-        await update.message.reply_text("Your ghost file is empty. Tap 🗂️ Add a Guy to file someone!", reply_markup=MAIN_KEYBOARD)
-        return
-    lines = ["👻 Your Ghost File:\n"]
-    for i, (_, entry) in enumerate(entries.items(), 1):
-        date = entry.get("date", "unknown date")
-        lines.append(f"{i}. {entry['name']} — {entry['description']} (filed {date})")
-    lines.append("\nTap 🔍 Look Up to read the full file on anyone.")
-    await update.message.reply_text("\n".join(lines), reply_markup=MAIN_KEYBOARD)
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+    }
 
-# ── Lookup ────────────────────────────────────────────────────────────────────
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Syne', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
 
-async def lookup_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    data = load_data()
-    entries = data.get(user_id, {})
-    if not entries:
-        await update.message.reply_text("Your ghost file is empty.", reply_markup=MAIN_KEYBOARD)
-        return
-    keyboard = [
-        [InlineKeyboardButton(entry["name"], callback_data=f"lookup:{key}")]
-        for key, entry in entries.items()
-    ]
-    await update.message.reply_text("Who do you want to look up?", reply_markup=InlineKeyboardMarkup(keyboard))
+    .logo-ghost {
+      font-size: 1.6rem;
+      filter: drop-shadow(0 0 8px #b388ff88);
+      animation: float 3s ease-in-out infinite;
+    }
 
-async def lookup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = str(query.from_user.id)
-    key = query.data.replace("lookup:", "")
-    data = load_data()
-    entries = data.get(user_id, {})
-    if key not in entries:
-        await query.edit_message_text("Couldn't find that entry.")
-        return
-    entry = entries[key]
-    icks = entry.get("icks", [])
-    ick_text = "\n\n🤢 Icks:\n" + "\n".join(f"  — {ick}" for ick in icks) if icks else ""
-    text = (
-        f"🗂️ Ghost File: {entry['name']}\n\n"
-        f"📌 Who: {entry['description']}\n"
-        f"📅 Filed: {entry.get('date', 'unknown date')}\n\n"
-        f"🚩 Why you said no:\n{entry['reason']}"
-        f"{ick_text}"
-    )
-    photo = entry.get("photo")
-    if photo:
-        await query.message.reply_photo(photo=photo, caption=text)
-        await query.edit_message_text("Here's his file 👇")
-    else:
-        await query.edit_message_text(text)
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
 
-# ── Edit flow ─────────────────────────────────────────────────────────────────
+    .add-btn {
+      background: var(--accent2);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .add-btn:hover { background: var(--accent); transform: translateY(-1px); }
+    .add-btn:active { transform: translateY(0); }
 
-async def edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    data = load_data()
-    entries = data.get(user_id, {})
-    if not entries:
-        await update.message.reply_text("Your ghost file is empty.", reply_markup=MAIN_KEYBOARD)
-        return ConversationHandler.END
-    keyboard = [
-        [InlineKeyboardButton(entry["name"], callback_data=f"edit_who:{key}")]
-        for key, entry in entries.items()
-    ]
-    await update.message.reply_text("Who do you want to edit?", reply_markup=InlineKeyboardMarkup(keyboard))
-    return EDIT_SELECT
+    /* ── Layout ── */
+    main {
+      flex: 1;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
 
-async def edit_who_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    key = query.data.replace("edit_who:", "")
-    context.user_data["edit_key"] = key
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📝 Name", callback_data="edit_field:name"),
-         InlineKeyboardButton("📌 Description", callback_data="edit_field:description")],
-        [InlineKeyboardButton("🚩 Reason", callback_data="edit_field:reason"),
-         InlineKeyboardButton("🤢 Icks", callback_data="edit_field:icks")],
-        [InlineKeyboardButton("📸 Photo", callback_data="edit_field:photo")],
-    ])
-    await query.edit_message_text("What do you want to edit?", reply_markup=keyboard)
-    return EDIT_FIELD
+    /* ── Empty state ── */
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 80px 20px;
+      text-align: center;
+    }
 
-async def edit_field_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    field = query.data.replace("edit_field:", "")
-    context.user_data["edit_field"] = field
+    .empty-ghost { font-size: 4rem; }
 
-    if field == "icks":
-        user_id = str(query.from_user.id)
-        key = context.user_data["edit_key"]
-        data = load_data()
-        entry = data.get(user_id, {}).get(key, {})
-        current_icks = entry.get("icks", [])
-        ick_list = "\n".join(f"  — {ick}" for ick in current_icks) if current_icks else "  (none yet)"
-        await query.edit_message_text(
-            f"Current icks:\n{ick_list}\n\n"
-            "Send the full new icks list, one per line.\n"
-            "Or send a single dash — to clear all icks."
-        )
-    elif field == "photo":
-        await query.edit_message_text("Send a new photo, or type /removephoto to remove the current one.")
-        return EDIT_PHOTO
-    else:
-        labels = {"name": "name", "description": "description", "reason": "reason"}
-        await query.edit_message_text(f"Send the new {labels[field]}:")
+    .empty h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
 
-    return EDIT_VALUE
+    .empty p { color: var(--muted); font-size: 0.95rem; line-height: 1.6; }
 
-async def edit_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    key = context.user_data["edit_key"]
-    field = context.user_data["edit_field"]
-    new_value = update.message.text.strip()
+    /* ── Cards ── */
+    .cards { display: flex; flex-direction: column; gap: 14px; }
 
-    data = load_data()
-    if user_id not in data or key not in data[user_id]:
-        await update.message.reply_text("Couldn't find that entry.", reply_markup=MAIN_KEYBOARD)
-        return ConversationHandler.END
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
 
-    entry = data[user_id][key]
+    .card:hover { border-color: var(--accent2); }
 
-    if field == "name":
-        old_key = key
-        new_key = new_value.lower()
-        entry["name"] = new_value
-        data[user_id][new_key] = entry
-        del data[user_id][old_key]
-    elif field == "icks":
-        if new_value == "-":
-            entry["icks"] = []
-        else:
-            entry["icks"] = [line.strip() for line in new_value.split("\n") if line.strip()]
-    else:
-        entry[field] = new_value
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px;
+    }
 
-    save_data(data)
-    await update.message.reply_text(f"✅ Updated successfully!", reply_markup=MAIN_KEYBOARD)
-    return ConversationHandler.END
+    .card-left { display: flex; align-items: center; gap: 14px; }
 
-async def edit_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    key = context.user_data["edit_key"]
-    data = load_data()
-    if user_id in data and key in data[user_id]:
-        data[user_id][key]["photo"] = update.message.photo[-1].file_id
-        save_data(data)
-        await update.message.reply_text("✅ Photo updated!", reply_markup=MAIN_KEYBOARD)
-    return ConversationHandler.END
+    .card-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
 
-async def remove_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    key = context.user_data["edit_key"]
-    data = load_data()
-    if user_id in data and key in data[user_id]:
-        data[user_id][key]["photo"] = None
-        save_data(data)
-        await update.message.reply_text("✅ Photo removed.", reply_markup=MAIN_KEYBOARD)
-    return ConversationHandler.END
+    .card-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
 
-# ── Add Ick flow ──────────────────────────────────────────────────────────────
+    .card-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+    }
 
-async def addick_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    data = load_data()
-    entries = data.get(user_id, {})
-    if not entries:
-        await update.message.reply_text("Your ghost file is empty.", reply_markup=MAIN_KEYBOARD)
-        return ConversationHandler.END
-    keyboard = [
-        [InlineKeyboardButton(entry["name"], callback_data=f"addick:{key}")]
-        for key, entry in entries.items()
-    ]
-    await update.message.reply_text("Who are you adding an ick for?", reply_markup=InlineKeyboardMarkup(keyboard))
-    return ADD_ICK_NAME
+    .card-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
 
-async def addick_name_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    context.user_data["ick_target"] = query.data.replace("addick:", "")
-    await query.edit_message_text("What's the ick? 🤢")
-    return ADD_ICK_TEXT
+    .card-actions { display: flex; gap: 8px; }
 
-async def addick_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    key = context.user_data["ick_target"]
-    data = load_data()
-    if user_id in data and key in data[user_id]:
-        data[user_id][key].setdefault("icks", []).append(update.message.text.strip())
-        save_data(data)
-        await update.message.reply_text(f"🤢 Ick added to {data[user_id][key]['name']}'s file!", reply_markup=MAIN_KEYBOARD)
-    else:
-        await update.message.reply_text("Couldn't find that entry.", reply_markup=MAIN_KEYBOARD)
-    return ConversationHandler.END
+    .icon-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.15s;
+    }
 
-# ── Delete ────────────────────────────────────────────────────────────────────
+    .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+    .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
-async def delete_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    data = load_data()
-    entries = data.get(user_id, {})
-    if not entries:
-        await update.message.reply_text("Your ghost file is empty.", reply_markup=MAIN_KEYBOARD)
-        return
-    keyboard = [
-        [InlineKeyboardButton(f"🗑️ {entry['name']}", callback_data=f"delete:{key}")]
-        for key, entry in entries.items()
-    ]
-    await update.message.reply_text("Who do you want to remove?", reply_markup=InlineKeyboardMarkup(keyboard))
+    .card-body {
+      padding: 0 20px 18px;
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
 
-async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = str(query.from_user.id)
-    key = query.data.replace("delete:", "")
-    data = load_data()
-    if user_id not in data or key not in data[user_id]:
-        await query.edit_message_text("Couldn't find that entry.")
-        return
-    name = data[user_id][key]["name"]
-    del data[user_id][key]
-    save_data(data)
-    await query.edit_message_text(f"✅ {name} has been removed from your ghost file.")
+    .card-body.open { display: flex; }
 
-# ── Button router ─────────────────────────────────────────────────────────────
+    .divider { height: 1px; background: var(--border); }
 
-async def button_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    if text == "👀 My List":
-        await list_entries(update, context)
-    elif text == "🔍 Look Up":
-        await lookup_start(update, context)
-    elif text == "🗑️ Delete":
-        await delete_start(update, context)
-    elif text == "❓ Help":
-        await help_cmd(update, context)
+    .field-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+    .field-value { font-size: 0.9rem; line-height: 1.5; }
 
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    .ick-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 
-    add_conv = ConversationHandler(
-        entry_points=[
-            CommandHandler("add", add_start),
-            MessageHandler(filters.Regex("^🗂️ Add a Guy$"), add_start),
-        ],
-        states={
-            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_name)],
-            DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_description)],
-            REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_reason)],
-            ICKS: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_ick_item)],
-            PHOTO: [
-                MessageHandler(filters.PHOTO, add_photo),
-                MessageHandler(filters.Regex("^⏭️ Skip$"), skip_photo),
-            ],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)]
-    )
+    .ick-tag {
+      background: #2a1a00;
+      border: 1px solid #3d2800;
+      color: var(--ick);
+      font-size: 0.78rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
 
-    addick_conv = ConversationHandler(
-        entry_points=[
-            CommandHandler("addick", addick_start),
-            MessageHandler(filters.Regex("^🤢 Add an Ick$"), addick_start),
-        ],
-        states={
-            ADD_ICK_NAME: [CallbackQueryHandler(addick_name_callback, pattern="^addick:")],
-            ADD_ICK_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, addick_text)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)]
-    )
+    .card-photo {
+      width: 100%;
+      border-radius: 10px;
+      max-height: 220px;
+      object-fit: cover;
+    }
 
-    edit_conv = ConversationHandler(
-        entry_points=[
-            CommandHandler("edit", edit_start),
-            MessageHandler(filters.Regex("^✏️ Edit$"), edit_start),
-        ],
-        states={
-            EDIT_SELECT: [CallbackQueryHandler(edit_who_callback, pattern="^edit_who:")],
-            EDIT_FIELD: [CallbackQueryHandler(edit_field_callback, pattern="^edit_field:")],
-            EDIT_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_value)],
-            EDIT_PHOTO: [
-                MessageHandler(filters.PHOTO, edit_photo),
-                CommandHandler("removephoto", remove_photo),
-            ],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)]
-    )
+    /* ── Modal ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_cmd))
-    app.add_handler(CommandHandler("list", list_entries))
-    app.add_handler(CommandHandler("lookup", lookup_start))
-    app.add_handler(CommandHandler("delete", delete_start))
-    app.add_handler(add_conv)
-    app.add_handler(addick_conv)
-    app.add_handler(edit_conv)
-    app.add_handler(CallbackQueryHandler(lookup_callback, pattern="^lookup:"))
-    app.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete:"))
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex("^(👀 My List|🔍 Look Up|🗑️ Delete|❓ Help)$"),
-        button_router
-    ))
+    .overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
 
-    print("GhostFileBot is running... 👻")
-    app.run_polling()
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-width: 720px;
+      padding: 28px 24px 40px;
+      transform: translateY(30px);
+      transition: transform 0.25s ease;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
 
-if __name__ == "__main__":
-    main()
+    .overlay.open .modal { transform: translateY(0); }
+
+    .modal-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 24px;
+    }
+
+    .form-group { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      resize: vertical;
+    }
+
+    input[type="text"]:focus, textarea:focus { border-color: var(--accent2); }
+
+    .ick-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ick-input-row input { flex: 1; }
+
+    .ick-add-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: border-color 0.2s;
+      white-space: nowrap;
+    }
+
+    .ick-add-btn:hover { border-color: var(--ick); }
+
+    .ick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+    .ick-chip {
+      background: #2a1a00;
+      border: 1px solid #3d2800;
+      color: var(--ick);
+      font-size: 0.8rem;
+      padding: 4px 10px 4px 12px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ick-chip button {
+      background: none;
+      border: none;
+      color: var(--ick);
+      cursor: pointer;
+      font-size: 0.9rem;
+      line-height: 1;
+      opacity: 0.6;
+      padding: 0;
+    }
+
+    .ick-chip button:hover { opacity: 1; }
+
+    .photo-upload {
+      background: var(--surface2);
+      border: 1.5px dashed var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      position: relative;
+    }
+
+    .photo-upload:hover { border-color: var(--accent2); }
+
+    .photo-upload input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .photo-upload p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+    .photo-preview {
+      width: 100%;
+      max-height: 160px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+
+    .btn-primary {
+      flex: 1;
+      background: var(--accent2);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover { background: var(--accent); }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .btn-secondary:hover { color: var(--text); }
+
+    /* ── Search ── */
+    .search-bar {
+      display: flex;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .search-bar input {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      outline: none;
+      flex: 1;
+    }
+
+    .search-icon { color: var(--muted); font-size: 1rem; }
+
+    /* ── Count badge ── */
+    .count-badge {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .count-badge span { color: var(--accent); font-weight: 600; }
+
+    @media (max-width: 500px) {
+      header { padding: 16px; }
+      .modal { padding: 24px 16px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-ghost">👻</span>
+    GhostFile
+  </div>
+  <button class="add-btn" onclick="openModal()">+ Add a Guy</button>
+</header>
+
+<main>
+  <div id="empty-state" class="empty">
+    <div class="empty-ghost">👻</div>
+    <h2>Your ghost file is empty</h2>
+    <p>Add a guy to remember exactly why<br>you said no — for when he comes back.</p>
+  </div>
+
+  <div id="list-view" style="display:none">
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" placeholder="Search by name or description..." oninput="renderList()" id="search-input" />
+    </div>
+    <div class="count-badge" id="count-badge"></div>
+    <div class="cards" id="cards-container"></div>
+  </div>
+</main>
+
+<!-- Add / Edit Modal -->
+<div class="overlay" id="overlay" onclick="closeOnBackdrop(event)">
+  <div class="modal" id="modal">
+    <div class="modal-title" id="modal-title">File a Guy 🗂️</div>
+
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Ahmed" />
+    </div>
+
+    <div class="form-group">
+      <label>Who is he?</label>
+      <input type="text" id="f-desc" placeholder="e.g. guy from the gym, ex from 2022" />
+    </div>
+
+    <div class="form-group">
+      <label>Why you said no</label>
+      <textarea id="f-reason" rows="3" placeholder="The real reason..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Icks 🤢</label>
+      <div class="ick-input-row">
+        <input type="text" id="f-ick-input" placeholder="Type an ick and press Add" onkeydown="ickKeydown(event)" />
+        <button class="ick-add-btn" onclick="addIck()">+ Add</button>
+      </div>
+      <div class="ick-chips" id="ick-chips"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Photo / Screenshot</label>
+      <div class="photo-upload">
+        <input type="file" accept="image/*" onchange="handlePhoto(event)" id="f-photo-input" />
+        <div>📸</div>
+        <p>Tap to upload a photo or screenshot</p>
+      </div>
+      <img class="photo-preview" id="photo-preview" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveEntry()">Save to File</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let entries = JSON.parse(localStorage.getItem('ghostfile') || '[]');
+  let currentIcks = [];
+  let currentPhotoData = null;
+  let editingId = null;
+
+  function save() {
+    localStorage.setItem('ghostfile', JSON.stringify(entries));
+  }
+
+  function renderList() {
+    const query = document.getElementById('search-input').value.toLowerCase();
+    const filtered = entries.filter(e =>
+      e.name.toLowerCase().includes(query) ||
+      e.desc.toLowerCase().includes(query)
+    );
+
+    document.getElementById('empty-state').style.display = entries.length === 0 ? 'flex' : 'none';
+    document.getElementById('list-view').style.display = entries.length === 0 ? 'none' : 'block';
+
+    const badge = document.getElementById('count-badge');
+    badge.innerHTML = `<span>${filtered.length}</span> in your ghost file`;
+
+    const container = document.getElementById('cards-container');
+    container.innerHTML = '';
+
+    filtered.forEach(entry => {
+      const ickTags = entry.icks.map(i => `<span class="ick-tag">🤢 ${i}</span>`).join('');
+      const photoEl = entry.photo
+        ? `<img src="${entry.photo}" class="card-photo" />`
+        : '';
+      const initials = entry.name.charAt(0).toUpperCase();
+      const avatarInner = entry.photo
+        ? `<img src="${entry.photo}" />`
+        : initials;
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-header" onclick="toggleCard('${entry.id}')">
+          <div class="card-left">
+            <div class="card-avatar" id="avatar-${entry.id}">${avatarInner}</div>
+            <div>
+              <div class="card-name">${entry.name}</div>
+              <div class="card-meta">${entry.desc} · ${entry.date}</div>
+            </div>
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <button class="icon-btn" title="Edit" onclick="openEdit('${entry.id}')">✏️</button>
+            <button class="icon-btn danger" title="Delete" onclick="deleteEntry('${entry.id}')">🗑️</button>
+          </div>
+        </div>
+        <div class="card-body" id="body-${entry.id}">
+          <div class="divider"></div>
+          <div>
+            <div class="field-label">Why you said no</div>
+            <div class="field-value">${entry.reason}</div>
+          </div>
+          ${entry.icks.length ? `<div>
+            <div class="field-label">Icks</div>
+            <div class="ick-list">${ickTags}</div>
+          </div>` : ''}
+          ${photoEl ? `<div>${photoEl}</div>` : ''}
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function toggleCard(id) {
+    const body = document.getElementById('body-' + id);
+    body.classList.toggle('open');
+  }
+
+  function openModal(resetEdit = true) {
+    if (resetEdit) {
+      editingId = null;
+      currentIcks = [];
+      currentPhotoData = null;
+      document.getElementById('f-name').value = '';
+      document.getElementById('f-desc').value = '';
+      document.getElementById('f-reason').value = '';
+      document.getElementById('f-ick-input').value = '';
+      document.getElementById('f-photo-input').value = '';
+      document.getElementById('photo-preview').style.display = 'none';
+      document.getElementById('modal-title').textContent = 'File a Guy 🗂️';
+      document.querySelector('.btn-primary').textContent = 'Save to File';
+      renderIckChips();
+    }
+    document.getElementById('overlay').classList.add('open');
+    setTimeout(() => document.getElementById('f-name').focus(), 300);
+  }
+
+  function openEdit(id) {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    editingId = id;
+    currentIcks = [...entry.icks];
+    currentPhotoData = entry.photo || null;
+
+    document.getElementById('f-name').value = entry.name;
+    document.getElementById('f-desc').value = entry.desc;
+    document.getElementById('f-reason').value = entry.reason;
+    document.getElementById('f-ick-input').value = '';
+    document.getElementById('modal-title').textContent = `Edit ${entry.name} ✏️`;
+    document.querySelector('.btn-primary').textContent = 'Save Changes';
+
+    const preview = document.getElementById('photo-preview');
+    if (currentPhotoData) {
+      preview.src = currentPhotoData;
+      preview.style.display = 'block';
+    } else {
+      preview.style.display = 'none';
+    }
+
+    renderIckChips();
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('overlay').classList.remove('open');
+  }
+
+  function closeOnBackdrop(e) {
+    if (e.target === document.getElementById('overlay')) closeModal();
+  }
+
+  function addIck() {
+    const input = document.getElementById('f-ick-input');
+    const val = input.value.trim();
+    if (!val) return;
+    currentIcks.push(val);
+    input.value = '';
+    renderIckChips();
+  }
+
+  function ickKeydown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addIck(); }
+  }
+
+  function removeIck(i) {
+    currentIcks.splice(i, 1);
+    renderIckChips();
+  }
+
+  function renderIckChips() {
+    const container = document.getElementById('ick-chips');
+    container.innerHTML = currentIcks.map((ick, i) =>
+      `<div class="ick-chip">🤢 ${ick}<button onclick="removeIck(${i})">×</button></div>`
+    ).join('');
+  }
+
+  function handlePhoto(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      currentPhotoData = ev.target.result;
+      const preview = document.getElementById('photo-preview');
+      preview.src = currentPhotoData;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function saveEntry() {
+    const name = document.getElementById('f-name').value.trim();
+    const desc = document.getElementById('f-desc').value.trim();
+    const reason = document.getElementById('f-reason').value.trim();
+    if (!name || !reason) {
+      alert('Name and reason are required!');
+      return;
+    }
+    if (editingId) {
+      const idx = entries.findIndex(e => e.id === editingId);
+      if (idx !== -1) {
+        entries[idx] = { ...entries[idx], name, desc, reason, icks: [...currentIcks], photo: currentPhotoData };
+      }
+    } else {
+      entries.unshift({
+        id: Date.now().toString(),
+        name, desc, reason,
+        icks: [...currentIcks],
+        photo: currentPhotoData,
+        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      });
+    }
+    save();
+    closeModal();
+    renderList();
+  }
+
+  function deleteEntry(id) {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    if (!confirm(`Remove ${entry.name} from your ghost file?`)) return;
+    entries = entries.filter(e => e.id !== id);
+    save();
+    renderList();
+  }
+
+  renderList();
+</script>
+</body>
+</html>
