@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GhostFileBot</title>
+  <title>GhostFile</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👻</text></svg>" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0e0e12;
@@ -18,463 +19,202 @@
       --text: #f0eeff;
       --muted: #7b7a94;
       --ick: #ff9f43;
+      --charm: #48dbfb;
+      --toxic: #ff6b6b;
+      --effort: #1dd1a1;
+      --smell: #ffd32a;
+      --redflag: #ff4757;
+      --heartbreak: #fd79a8;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
 
     /* ── Header ── */
     header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 20px 28px;
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      background: var(--bg);
-      z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg); z-index: 100;
     }
+    .logo { display: flex; align-items: center; gap: 10px; font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 800; }
+    .logo-ghost { font-size: 1.5rem; filter: drop-shadow(0 0 8px #b388ff88); animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+    .add-btn { background: var(--accent2); color: white; border: none; padding: 9px 18px; border-radius: 10px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: background 0.2s; }
+    .add-btn:hover { background: var(--accent); }
 
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: 'Syne', sans-serif;
-      font-size: 1.3rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 4px; padding: 14px 24px 0; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 18px; border-radius: 10px 10px 0 0; font-size: 0.88rem; font-weight: 600; cursor: pointer; color: var(--muted); border: 1px solid transparent; border-bottom: none; transition: all 0.15s; }
+    .tab.active { color: var(--text); background: var(--surface); border-color: var(--border); }
+    .tab:hover:not(.active) { color: var(--text); }
 
-    .logo-ghost {
-      font-size: 1.6rem;
-      filter: drop-shadow(0 0 8px #b388ff88);
-      animation: float 3s ease-in-out infinite;
-    }
+    /* ── Main ── */
+    main { flex: 1; max-width: 760px; width: 100%; margin: 0 auto; padding: 28px 20px 80px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
 
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
-    }
-
-    .add-btn {
-      background: var(--accent2);
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 10px;
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-    }
-    .add-btn:hover { background: var(--accent); transform: translateY(-1px); }
-    .add-btn:active { transform: translateY(0); }
-
-    /* ── Layout ── */
-    main {
-      flex: 1;
-      max-width: 720px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 32px 20px 80px;
-    }
-
-    /* ── Empty state ── */
-    .empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      padding: 80px 20px;
-      text-align: center;
-    }
-
-    .empty-ghost { font-size: 4rem; }
-
-    .empty h2 {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.4rem;
-      font-weight: 700;
-    }
-
-    .empty p { color: var(--muted); font-size: 0.95rem; line-height: 1.6; }
+    /* ── Empty ── */
+    .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 70px 20px; text-align: center; }
+    .empty-ghost { font-size: 3.5rem; }
+    .empty h2 { font-family: 'Syne', sans-serif; font-size: 1.3rem; }
+    .empty p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
 
     /* ── Cards ── */
-    .cards { display: flex; flex-direction: column; gap: 14px; }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
-      transition: border-color 0.2s;
-      cursor: pointer;
-    }
-
+    .search-bar { display: flex; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; gap: 10px; margin-bottom: 18px; }
+    .search-bar input { background: none; border: none; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.9rem; outline: none; flex: 1; }
+    .count-badge { font-size: 0.8rem; color: var(--muted); margin-bottom: 14px; }
+    .count-badge span { color: var(--accent); font-weight: 600; }
+    .cards { display: flex; flex-direction: column; gap: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color 0.2s; cursor: pointer; }
     .card:hover { border-color: var(--accent2); }
-
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 20px;
-    }
-
-    .card-left { display: flex; align-items: center; gap: 14px; }
-
-    .card-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.3rem;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-
-    .card-avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .card-name {
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 1rem;
-    }
-
-    .card-meta {
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-
-    .card-actions { display: flex; gap: 8px; }
-
-    .icon-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 0.95rem;
-      transition: all 0.15s;
-    }
-
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; }
+    .card-left { display: flex; align-items: center; gap: 13px; }
+    .card-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; overflow: hidden; font-family: 'Syne', sans-serif; font-weight: 800; }
+    .card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .card-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.98rem; }
+    .card-meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+    .card-actions { display: flex; gap: 7px; }
+    .icon-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: all 0.15s; }
     .icon-btn:hover { color: var(--text); border-color: var(--accent); }
     .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
-
-    .card-body {
-      padding: 0 20px 18px;
-      display: none;
-      flex-direction: column;
-      gap: 14px;
-    }
-
+    .card-body { padding: 0 18px 16px; display: none; flex-direction: column; gap: 12px; }
     .card-body.open { display: flex; }
-
     .divider { height: 1px; background: var(--border); }
+    .field-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
+    .field-value { font-size: 0.88rem; line-height: 1.5; }
+    .ick-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+    .ick-tag { background: #2a1a00; border: 1px solid #3d2800; color: var(--ick); font-size: 0.76rem; padding: 3px 9px; border-radius: 20px; }
+    .card-photo { width: 100%; border-radius: 10px; max-height: 200px; object-fit: cover; }
 
-    .field-label {
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
+    /* ── Ratings mini display ── */
+    .ratings-mini { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rating-pill { font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
 
-    .field-value { font-size: 0.9rem; line-height: 1.5; }
+    /* ── Stats Tab ── */
+    .stats-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 60px 20px; text-align: center; color: var(--muted); }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+    @media(max-width:560px){ .stats-grid { grid-template-columns: 1fr; } }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .stat-card h3 { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 16px; }
+    .chart-wrap { position: relative; width: 100%; }
+    .chart-full { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 16px; }
+    .chart-full h3 { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 16px; }
 
-    .ick-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-
-    .ick-tag {
-      background: #2a1a00;
-      border: 1px solid #3d2800;
-      color: var(--ick);
-      font-size: 0.78rem;
-      padding: 3px 10px;
-      border-radius: 20px;
-    }
-
-    .card-photo {
-      width: 100%;
-      border-radius: 10px;
-      max-height: 220px;
-      object-fit: cover;
-    }
+    /* ── Hall of Shame ── */
+    .shame-list { display: flex; flex-direction: column; gap: 10px; }
+    .shame-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface2); border-radius: 10px; }
+    .shame-name { font-weight: 600; font-size: 0.9rem; }
+    .shame-score { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; color: var(--toxic); }
+    .shame-rank { font-size: 1.2rem; margin-right: 10px; }
 
     /* ── Modal ── */
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 200;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-    }
-
-    .overlay.open {
-      opacity: 1;
-      pointer-events: all;
-    }
-
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px 20px 0 0;
-      width: 100%;
-      max-width: 720px;
-      padding: 28px 24px 40px;
-      transform: translateY(30px);
-      transition: transform 0.25s ease;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px 20px 0 0; width: 100%; max-width: 760px; padding: 26px 22px 40px; transform: translateY(30px); transition: transform 0.25s ease; max-height: 92vh; overflow-y: auto; }
     .overlay.open .modal { transform: translateY(0); }
-
-    .modal-title {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.25rem;
-      font-weight: 800;
-      margin-bottom: 24px;
-    }
-
-    .form-group { margin-bottom: 18px; }
-
-    label {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-
-    input[type="text"], textarea {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.95rem;
-      padding: 12px 14px;
-      outline: none;
-      transition: border-color 0.2s;
-      resize: vertical;
-    }
-
+    .modal-title { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; margin-bottom: 22px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 7px; }
+    input[type="text"], textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.92rem; padding: 11px 13px; outline: none; transition: border-color 0.2s; resize: vertical; }
     input[type="text"]:focus, textarea:focus { border-color: var(--accent2); }
-
-    .ick-input-row {
-      display: flex;
-      gap: 8px;
-    }
-
+    .ick-input-row { display: flex; gap: 8px; }
     .ick-input-row input { flex: 1; }
-
-    .ick-add-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0 16px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1.1rem;
-      transition: border-color 0.2s;
-      white-space: nowrap;
-    }
-
+    .ick-add-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 0 14px; border-radius: 10px; cursor: pointer; font-size: 1rem; transition: border-color 0.2s; white-space: nowrap; }
     .ick-add-btn:hover { border-color: var(--ick); }
-
-    .ick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-
-    .ick-chip {
-      background: #2a1a00;
-      border: 1px solid #3d2800;
-      color: var(--ick);
-      font-size: 0.8rem;
-      padding: 4px 10px 4px 12px;
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .ick-chip button {
-      background: none;
-      border: none;
-      color: var(--ick);
-      cursor: pointer;
-      font-size: 0.9rem;
-      line-height: 1;
-      opacity: 0.6;
-      padding: 0;
-    }
-
+    .ick-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+    .ick-chip { background: #2a1a00; border: 1px solid #3d2800; color: var(--ick); font-size: 0.78rem; padding: 3px 10px 3px 12px; border-radius: 20px; display: flex; align-items: center; gap: 5px; }
+    .ick-chip button { background: none; border: none; color: var(--ick); cursor: pointer; font-size: 0.88rem; opacity: 0.6; padding: 0; }
     .ick-chip button:hover { opacity: 1; }
-
-    .photo-upload {
-      background: var(--surface2);
-      border: 1.5px dashed var(--border);
-      border-radius: 10px;
-      padding: 24px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s;
-      position: relative;
-    }
-
+    .photo-upload { background: var(--surface2); border: 1.5px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; }
     .photo-upload:hover { border-color: var(--accent2); }
-
-    .photo-upload input {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
-    }
-
-    .photo-upload p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
-
-    .photo-preview {
-      width: 100%;
-      max-height: 160px;
-      object-fit: cover;
-      border-radius: 8px;
-      margin-top: 10px;
-      display: none;
-    }
-
-    .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
-
-    .btn-primary {
-      flex: 1;
-      background: var(--accent2);
-      color: white;
-      border: none;
-      padding: 14px;
-      border-radius: 10px;
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
+    .photo-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .photo-upload p { color: var(--muted); font-size: 0.82rem; margin-top: 5px; }
+    .photo-preview { width: 100%; max-height: 150px; object-fit: cover; border-radius: 8px; margin-top: 10px; display: none; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+    .btn-primary { flex: 1; background: var(--accent2); color: white; border: none; padding: 13px; border-radius: 10px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.92rem; cursor: pointer; transition: background 0.2s; }
     .btn-primary:hover { background: var(--accent); }
-
-    .btn-secondary {
-      background: var(--surface2);
-      color: var(--muted);
-      border: 1px solid var(--border);
-      padding: 14px 20px;
-      border-radius: 10px;
-      font-family: 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: color 0.2s;
-    }
-
+    .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); padding: 13px 18px; border-radius: 10px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.92rem; cursor: pointer; }
     .btn-secondary:hover { color: var(--text); }
 
-    /* ── Search ── */
-    .search-bar {
-      display: flex;
-      align-items: center;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 14px;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
+    /* ── Rating sliders ── */
+    .ratings-section { background: var(--surface2); border-radius: 12px; padding: 16px; }
+    .ratings-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 14px; }
+    .rating-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .rating-emoji { font-size: 1.1rem; width: 24px; text-align: center; }
+    .rating-name { font-size: 0.82rem; width: 90px; color: var(--muted); }
+    .rating-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px; outline: none; cursor: pointer; }
+    .rating-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; }
+    .rating-val { font-size: 0.85rem; font-weight: 700; width: 20px; text-align: right; }
 
-    .search-bar input {
-      background: none;
-      border: none;
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
-      outline: none;
-      flex: 1;
-    }
+    /* slider colors */
+    #s-charm { background: linear-gradient(to right, var(--charm) 0%, var(--charm) 50%, var(--border) 50%); }
+    #s-charm::-webkit-slider-thumb { background: var(--charm); }
+    #s-toxicity { background: linear-gradient(to right, var(--toxic) 0%, var(--toxic) 50%, var(--border) 50%); }
+    #s-toxicity::-webkit-slider-thumb { background: var(--toxic); }
+    #s-effort { background: linear-gradient(to right, var(--effort) 0%, var(--effort) 50%, var(--border) 50%); }
+    #s-effort::-webkit-slider-thumb { background: var(--effort); }
+    #s-smell { background: linear-gradient(to right, var(--smell) 0%, var(--smell) 50%, var(--border) 50%); }
+    #s-smell::-webkit-slider-thumb { background: var(--smell); }
+    #s-redflag { background: linear-gradient(to right, var(--redflag) 0%, var(--redflag) 50%, var(--border) 50%); }
+    #s-redflag::-webkit-slider-thumb { background: var(--redflag); }
+    #s-heartbreak { background: linear-gradient(to right, var(--heartbreak) 0%, var(--heartbreak) 50%, var(--border) 50%); }
+    #s-heartbreak::-webkit-slider-thumb { background: var(--heartbreak); }
 
-    .search-icon { color: var(--muted); font-size: 1rem; }
-
-    /* ── Count badge ── */
-    .count-badge {
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-bottom: 16px;
-    }
-
-    .count-badge span { color: var(--accent); font-weight: 600; }
-
-    @media (max-width: 500px) {
-      header { padding: 16px; }
-      .modal { padding: 24px 16px 40px; }
-    }
+    .section-divider { font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 700; color: var(--muted); margin: 22px 0 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">
-    <span class="logo-ghost">👻</span>
-    GhostFile
-  </div>
+  <div class="logo"><span class="logo-ghost">👻</span> GhostFile</div>
   <button class="add-btn" onclick="openModal()">+ Add a Guy</button>
 </header>
 
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('files')">🗂️ Files</div>
+  <div class="tab" onclick="switchTab('stats')">📊 Stats</div>
+</div>
+
 <main>
-  <div id="empty-state" class="empty">
-    <div class="empty-ghost">👻</div>
-    <h2>Your ghost file is empty</h2>
-    <p>Add a guy to remember exactly why<br>you said no — for when he comes back.</p>
+  <!-- FILES TAB -->
+  <div class="tab-panel active" id="tab-files">
+    <div id="empty-state" class="empty">
+      <div class="empty-ghost">👻</div>
+      <h2>Your ghost file is empty</h2>
+      <p>Add a guy to remember exactly why<br>you said no — for when he comes back.</p>
+    </div>
+    <div id="list-view" style="display:none">
+      <div class="search-bar">
+        <span style="color:var(--muted)">🔍</span>
+        <input type="text" placeholder="Search by name or description..." oninput="renderList()" id="search-input" />
+      </div>
+      <div class="count-badge" id="count-badge"></div>
+      <div class="cards" id="cards-container"></div>
+    </div>
   </div>
 
-  <div id="list-view" style="display:none">
-    <div class="search-bar">
-      <span class="search-icon">🔍</span>
-      <input type="text" placeholder="Search by name or description..." oninput="renderList()" id="search-input" />
+  <!-- STATS TAB -->
+  <div class="tab-panel" id="tab-stats">
+    <div id="stats-empty" class="stats-empty">
+      <div style="font-size:3rem">📊</div>
+      <p>Add at least one guy with ratings<br>to see your stats.</p>
     </div>
-    <div class="count-badge" id="count-badge"></div>
-    <div class="cards" id="cards-container"></div>
+    <div id="stats-content" style="display:none">
+      <div class="section-divider">🏆 Hall of Shame</div>
+      <div class="shame-list" id="shame-list"></div>
+
+      <div class="section-divider" style="margin-top:28px">📊 Compare All Guys</div>
+      <div class="chart-full">
+        <h3>Ratings Comparison</h3>
+        <div class="chart-wrap"><canvas id="bar-chart"></canvas></div>
+      </div>
+
+      <div class="section-divider">🕸️ Individual Profiles</div>
+      <div class="stats-grid" id="radar-grid"></div>
+    </div>
   </div>
 </main>
 
-<!-- Add / Edit Modal -->
+<!-- Modal -->
 <div class="overlay" id="overlay" onclick="closeOnBackdrop(event)">
   <div class="modal" id="modal">
     <div class="modal-title" id="modal-title">File a Guy 🗂️</div>
@@ -483,17 +223,14 @@
       <label>Name</label>
       <input type="text" id="f-name" placeholder="e.g. Ahmed" />
     </div>
-
     <div class="form-group">
       <label>Who is he?</label>
       <input type="text" id="f-desc" placeholder="e.g. guy from the gym, ex from 2022" />
     </div>
-
     <div class="form-group">
       <label>Why you said no</label>
       <textarea id="f-reason" rows="3" placeholder="The real reason..."></textarea>
     </div>
-
     <div class="form-group">
       <label>Icks 🤢</label>
       <div class="ick-input-row">
@@ -501,6 +238,49 @@
         <button class="ick-add-btn" onclick="addIck()">+ Add</button>
       </div>
       <div class="ick-chips" id="ick-chips"></div>
+    </div>
+
+    <!-- Ratings -->
+    <div class="form-group">
+      <div class="ratings-section">
+        <div class="ratings-title">Rate Him 🎯</div>
+        <div class="rating-row">
+          <span class="rating-emoji">✨</span>
+          <span class="rating-name">Charm</span>
+          <input type="range" class="rating-slider" id="s-charm" min="1" max="10" value="5" oninput="updateSlider(this,'v-charm','--charm')" />
+          <span class="rating-val" id="v-charm">5</span>
+        </div>
+        <div class="rating-row">
+          <span class="rating-emoji">😈</span>
+          <span class="rating-name">Toxicity</span>
+          <input type="range" class="rating-slider" id="s-toxicity" min="1" max="10" value="5" oninput="updateSlider(this,'v-toxicity','--toxic')" />
+          <span class="rating-val" id="v-toxicity">5</span>
+        </div>
+        <div class="rating-row">
+          <span class="rating-emoji">💪</span>
+          <span class="rating-name">Effort</span>
+          <input type="range" class="rating-slider" id="s-effort" min="1" max="10" value="5" oninput="updateSlider(this,'v-effort','--effort')" />
+          <span class="rating-val" id="v-effort">5</span>
+        </div>
+        <div class="rating-row">
+          <span class="rating-emoji">👃</span>
+          <span class="rating-name">Smell</span>
+          <input type="range" class="rating-slider" id="s-smell" min="1" max="10" value="5" oninput="updateSlider(this,'v-smell','--smell')" />
+          <span class="rating-val" id="v-smell">5</span>
+        </div>
+        <div class="rating-row">
+          <span class="rating-emoji">🚩</span>
+          <span class="rating-name">Red Flags</span>
+          <input type="range" class="rating-slider" id="s-redflag" min="1" max="10" value="5" oninput="updateSlider(this,'v-redflag','--redflag')" />
+          <span class="rating-val" id="v-redflag">5</span>
+        </div>
+        <div class="rating-row">
+          <span class="rating-emoji">💔</span>
+          <span class="rating-name">Heartbreak</span>
+          <input type="range" class="rating-slider" id="s-heartbreak" min="1" max="10" value="5" oninput="updateSlider(this,'v-heartbreak','--heartbreak')" />
+          <span class="rating-val" id="v-heartbreak">5</span>
+        </div>
+      </div>
     </div>
 
     <div class="form-group">
@@ -525,80 +305,179 @@
   let currentIcks = [];
   let currentPhotoData = null;
   let editingId = null;
+  let barChart = null;
+  let radarCharts = {};
 
-  function save() {
-    localStorage.setItem('ghostfile', JSON.stringify(entries));
+  const TRAITS = [
+    { key: 'charm',      label: 'Charm',      color: '#48dbfb', sliderId: 's-charm',      valId: 'v-charm',      cssVar: '--charm' },
+    { key: 'toxicity',   label: 'Toxicity',   color: '#ff6b6b', sliderId: 's-toxicity',   valId: 'v-toxicity',   cssVar: '--toxic' },
+    { key: 'effort',     label: 'Effort',     color: '#1dd1a1', sliderId: 's-effort',     valId: 'v-effort',     cssVar: '--effort' },
+    { key: 'smell',      label: 'Smell',      color: '#ffd32a', sliderId: 's-smell',      valId: 'v-smell',      cssVar: '--smell' },
+    { key: 'redflag',    label: 'Red Flags',  color: '#ff4757', sliderId: 's-redflag',    valId: 'v-redflag',    cssVar: '--redflag' },
+    { key: 'heartbreak', label: 'Heartbreak', color: '#fd79a8', sliderId: 's-heartbreak', valId: 'v-heartbreak', cssVar: '--heartbreak' },
+  ];
+
+  const PALETTE = ['#b388ff','#48dbfb','#ff6b6b','#1dd1a1','#ffd32a','#fd79a8','#ff9f43','#a29bfe'];
+
+  function save() { localStorage.setItem('ghostfile', JSON.stringify(entries)); }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['files','stats'][i] === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'stats') renderStats();
   }
 
-  function renderList() {
-    const query = document.getElementById('search-input').value.toLowerCase();
-    const filtered = entries.filter(e =>
-      e.name.toLowerCase().includes(query) ||
-      e.desc.toLowerCase().includes(query)
-    );
+  function updateSlider(el, valId, cssVar) {
+    document.getElementById(valId).textContent = el.value;
+    const pct = ((el.value - 1) / 9 * 100).toFixed(0);
+    const color = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+    el.style.background = `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, var(--border) ${pct}%)`;
+  }
 
+  // ── List ──
+  function renderList() {
+    const query = (document.getElementById('search-input')?.value || '').toLowerCase();
+    const filtered = entries.filter(e => e.name.toLowerCase().includes(query) || (e.desc||'').toLowerCase().includes(query));
     document.getElementById('empty-state').style.display = entries.length === 0 ? 'flex' : 'none';
     document.getElementById('list-view').style.display = entries.length === 0 ? 'none' : 'block';
-
-    const badge = document.getElementById('count-badge');
-    badge.innerHTML = `<span>${filtered.length}</span> in your ghost file`;
-
+    document.getElementById('count-badge').innerHTML = `<span>${filtered.length}</span> in your ghost file`;
     const container = document.getElementById('cards-container');
     container.innerHTML = '';
-
     filtered.forEach(entry => {
-      const ickTags = entry.icks.map(i => `<span class="ick-tag">🤢 ${i}</span>`).join('');
-      const photoEl = entry.photo
-        ? `<img src="${entry.photo}" class="card-photo" />`
-        : '';
-      const initials = entry.name.charAt(0).toUpperCase();
-      const avatarInner = entry.photo
-        ? `<img src="${entry.photo}" />`
-        : initials;
-
+      const ickTags = (entry.icks||[]).map(i => `<span class="ick-tag">🤢 ${i}</span>`).join('');
+      const avatarInner = entry.photo ? `<img src="${entry.photo}" />` : entry.name.charAt(0).toUpperCase();
+      const ratings = entry.ratings || {};
+      const ratingPills = TRAITS.map(t =>
+        ratings[t.key] ? `<span class="rating-pill" style="background:${t.color}22;color:${t.color};border:1px solid ${t.color}44">${t.label[0]}${t.label.slice(1).toLowerCase()} ${ratings[t.key]}</span>` : ''
+      ).join('');
       const card = document.createElement('div');
       card.className = 'card';
       card.innerHTML = `
         <div class="card-header" onclick="toggleCard('${entry.id}')">
           <div class="card-left">
-            <div class="card-avatar" id="avatar-${entry.id}">${avatarInner}</div>
+            <div class="card-avatar">${avatarInner}</div>
             <div>
               <div class="card-name">${entry.name}</div>
-              <div class="card-meta">${entry.desc} · ${entry.date}</div>
+              <div class="card-meta">${entry.desc||''} · ${entry.date}</div>
             </div>
           </div>
           <div class="card-actions" onclick="event.stopPropagation()">
-            <button class="icon-btn" title="Edit" onclick="openEdit('${entry.id}')">✏️</button>
-            <button class="icon-btn danger" title="Delete" onclick="deleteEntry('${entry.id}')">🗑️</button>
+            <button class="icon-btn" onclick="openEdit('${entry.id}')">✏️</button>
+            <button class="icon-btn danger" onclick="deleteEntry('${entry.id}')">🗑️</button>
           </div>
         </div>
         <div class="card-body" id="body-${entry.id}">
           <div class="divider"></div>
-          <div>
-            <div class="field-label">Why you said no</div>
-            <div class="field-value">${entry.reason}</div>
-          </div>
-          ${entry.icks.length ? `<div>
-            <div class="field-label">Icks</div>
-            <div class="ick-list">${ickTags}</div>
-          </div>` : ''}
-          ${photoEl ? `<div>${photoEl}</div>` : ''}
-        </div>
-      `;
+          <div><div class="field-label">Why you said no</div><div class="field-value">${entry.reason}</div></div>
+          ${(entry.icks||[]).length ? `<div><div class="field-label">Icks</div><div class="ick-list">${ickTags}</div></div>` : ''}
+          ${ratingPills ? `<div><div class="field-label">Ratings</div><div class="ratings-mini" style="margin-top:6px">${ratingPills}</div></div>` : ''}
+          ${entry.photo ? `<div><img src="${entry.photo}" class="card-photo" /></div>` : ''}
+        </div>`;
       container.appendChild(card);
     });
   }
 
-  function toggleCard(id) {
-    const body = document.getElementById('body-' + id);
-    body.classList.toggle('open');
+  function toggleCard(id) { document.getElementById('body-'+id).classList.toggle('open'); }
+
+  // ── Stats ──
+  function renderStats() {
+    const rated = entries.filter(e => e.ratings && Object.keys(e.ratings).length > 0);
+    document.getElementById('stats-empty').style.display = rated.length === 0 ? 'flex' : 'none';
+    document.getElementById('stats-content').style.display = rated.length === 0 ? 'none' : 'block';
+    if (rated.length === 0) return;
+
+    // Hall of Shame
+    const shameList = document.getElementById('shame-list');
+    const ranked = [...rated].map(e => ({
+      name: e.name,
+      score: Math.round(((e.ratings.toxicity||0) + (e.ratings.redflag||0) + (e.ratings.heartbreak||0)) / 3 * 10) / 10
+    })).sort((a,b) => b.score - a.score);
+    const medals = ['🥇','🥈','🥉'];
+    shameList.innerHTML = ranked.map((r,i) => `
+      <div class="shame-row">
+        <div style="display:flex;align-items:center">
+          <span class="shame-rank">${medals[i]||'💀'}</span>
+          <span class="shame-name">${r.name}</span>
+        </div>
+        <span class="shame-score">${r.score}/10</span>
+      </div>`).join('');
+
+    // Bar chart
+    if (barChart) barChart.destroy();
+    const ctx = document.getElementById('bar-chart').getContext('2d');
+    barChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: TRAITS.map(t => t.label),
+        datasets: rated.map((e, i) => ({
+          label: e.name,
+          data: TRAITS.map(t => e.ratings[t.key] || 0),
+          backgroundColor: PALETTE[i % PALETTE.length] + 'aa',
+          borderColor: PALETTE[i % PALETTE.length],
+          borderWidth: 1.5,
+          borderRadius: 6,
+        }))
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#f0eeff', font: { family: 'Inter', size: 11 } } }
+        },
+        scales: {
+          x: { ticks: { color: '#7b7a94' }, grid: { color: '#2a2a38' } },
+          y: { min: 0, max: 10, ticks: { color: '#7b7a94', stepSize: 2 }, grid: { color: '#2a2a38' } }
+        }
+      }
+    });
+
+    // Radar charts
+    Object.values(radarCharts).forEach(c => c.destroy());
+    radarCharts = {};
+    const radarGrid = document.getElementById('radar-grid');
+    radarGrid.innerHTML = '';
+    rated.forEach((e, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'stat-card';
+      wrap.innerHTML = `<h3>👤 ${e.name}</h3><div class="chart-wrap"><canvas id="radar-${e.id}"></canvas></div>`;
+      radarGrid.appendChild(wrap);
+      const rctx = document.getElementById('radar-'+e.id).getContext('2d');
+      const color = PALETTE[i % PALETTE.length];
+      radarCharts[e.id] = new Chart(rctx, {
+        type: 'radar',
+        data: {
+          labels: TRAITS.map(t => t.label),
+          datasets: [{
+            label: e.name,
+            data: TRAITS.map(t => e.ratings[t.key] || 0),
+            backgroundColor: color + '33',
+            borderColor: color,
+            borderWidth: 2,
+            pointBackgroundColor: color,
+            pointRadius: 3,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            r: {
+              min: 0, max: 10,
+              ticks: { display: false, stepSize: 2 },
+              grid: { color: '#2a2a38' },
+              angleLines: { color: '#2a2a38' },
+              pointLabels: { color: '#7b7a94', font: { family: 'Inter', size: 10 } }
+            }
+          }
+        }
+      });
+    });
   }
 
+  // ── Modal ──
   function openModal(resetEdit = true) {
     if (resetEdit) {
-      editingId = null;
-      currentIcks = [];
-      currentPhotoData = null;
+      editingId = null; currentIcks = []; currentPhotoData = null;
       document.getElementById('f-name').value = '';
       document.getElementById('f-desc').value = '';
       document.getElementById('f-reason').value = '';
@@ -607,6 +486,11 @@
       document.getElementById('photo-preview').style.display = 'none';
       document.getElementById('modal-title').textContent = 'File a Guy 🗂️';
       document.querySelector('.btn-primary').textContent = 'Save to File';
+      TRAITS.forEach(t => {
+        document.getElementById(t.sliderId).value = 5;
+        document.getElementById(t.valId).textContent = 5;
+        updateSlider(document.getElementById(t.sliderId), t.valId, t.cssVar);
+      });
       renderIckChips();
     }
     document.getElementById('overlay').classList.add('open');
@@ -616,109 +500,70 @@
   function openEdit(id) {
     const entry = entries.find(e => e.id === id);
     if (!entry) return;
-    editingId = id;
-    currentIcks = [...entry.icks];
-    currentPhotoData = entry.photo || null;
-
+    editingId = id; currentIcks = [...(entry.icks||[])]; currentPhotoData = entry.photo || null;
     document.getElementById('f-name').value = entry.name;
-    document.getElementById('f-desc').value = entry.desc;
+    document.getElementById('f-desc').value = entry.desc || '';
     document.getElementById('f-reason').value = entry.reason;
-    document.getElementById('f-ick-input').value = '';
     document.getElementById('modal-title').textContent = `Edit ${entry.name} ✏️`;
     document.querySelector('.btn-primary').textContent = 'Save Changes';
-
+    const ratings = entry.ratings || {};
+    TRAITS.forEach(t => {
+      const val = ratings[t.key] || 5;
+      document.getElementById(t.sliderId).value = val;
+      document.getElementById(t.valId).textContent = val;
+      updateSlider(document.getElementById(t.sliderId), t.valId, t.cssVar);
+    });
     const preview = document.getElementById('photo-preview');
-    if (currentPhotoData) {
-      preview.src = currentPhotoData;
-      preview.style.display = 'block';
-    } else {
-      preview.style.display = 'none';
-    }
-
+    if (currentPhotoData) { preview.src = currentPhotoData; preview.style.display = 'block'; } else { preview.style.display = 'none'; }
     renderIckChips();
     document.getElementById('overlay').classList.add('open');
   }
 
-  function closeModal() {
-    document.getElementById('overlay').classList.remove('open');
-  }
-
-  function closeOnBackdrop(e) {
-    if (e.target === document.getElementById('overlay')) closeModal();
-  }
+  function closeModal() { document.getElementById('overlay').classList.remove('open'); }
+  function closeOnBackdrop(e) { if (e.target === document.getElementById('overlay')) closeModal(); }
 
   function addIck() {
     const input = document.getElementById('f-ick-input');
-    const val = input.value.trim();
-    if (!val) return;
-    currentIcks.push(val);
-    input.value = '';
-    renderIckChips();
+    const val = input.value.trim(); if (!val) return;
+    currentIcks.push(val); input.value = ''; renderIckChips();
   }
-
-  function ickKeydown(e) {
-    if (e.key === 'Enter') { e.preventDefault(); addIck(); }
-  }
-
-  function removeIck(i) {
-    currentIcks.splice(i, 1);
-    renderIckChips();
-  }
-
+  function ickKeydown(e) { if (e.key === 'Enter') { e.preventDefault(); addIck(); } }
+  function removeIck(i) { currentIcks.splice(i, 1); renderIckChips(); }
   function renderIckChips() {
-    const container = document.getElementById('ick-chips');
-    container.innerHTML = currentIcks.map((ick, i) =>
-      `<div class="ick-chip">🤢 ${ick}<button onclick="removeIck(${i})">×</button></div>`
-    ).join('');
+    document.getElementById('ick-chips').innerHTML = currentIcks.map((ick, i) =>
+      `<div class="ick-chip">🤢 ${ick}<button onclick="removeIck(${i})">×</button></div>`).join('');
   }
 
   function handlePhoto(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
       currentPhotoData = ev.target.result;
       const preview = document.getElementById('photo-preview');
-      preview.src = currentPhotoData;
-      preview.style.display = 'block';
+      preview.src = currentPhotoData; preview.style.display = 'block';
     };
     reader.readAsDataURL(file);
   }
 
   function saveEntry() {
     const name = document.getElementById('f-name').value.trim();
-    const desc = document.getElementById('f-desc').value.trim();
     const reason = document.getElementById('f-reason').value.trim();
-    if (!name || !reason) {
-      alert('Name and reason are required!');
-      return;
-    }
+    if (!name || !reason) { alert('Name and reason are required!'); return; }
+    const ratings = {};
+    TRAITS.forEach(t => { ratings[t.key] = parseInt(document.getElementById(t.sliderId).value); });
     if (editingId) {
       const idx = entries.findIndex(e => e.id === editingId);
-      if (idx !== -1) {
-        entries[idx] = { ...entries[idx], name, desc, reason, icks: [...currentIcks], photo: currentPhotoData };
-      }
+      if (idx !== -1) entries[idx] = { ...entries[idx], name, desc: document.getElementById('f-desc').value.trim(), reason, icks: [...currentIcks], photo: currentPhotoData, ratings };
     } else {
-      entries.unshift({
-        id: Date.now().toString(),
-        name, desc, reason,
-        icks: [...currentIcks],
-        photo: currentPhotoData,
-        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-      });
+      entries.unshift({ id: Date.now().toString(), name, desc: document.getElementById('f-desc').value.trim(), reason, icks: [...currentIcks], photo: currentPhotoData, ratings, date: new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) });
     }
-    save();
-    closeModal();
-    renderList();
+    save(); closeModal(); renderList();
   }
 
   function deleteEntry(id) {
     const entry = entries.find(e => e.id === id);
-    if (!entry) return;
-    if (!confirm(`Remove ${entry.name} from your ghost file?`)) return;
-    entries = entries.filter(e => e.id !== id);
-    save();
-    renderList();
+    if (!entry || !confirm(`Remove ${entry.name} from your ghost file?`)) return;
+    entries = entries.filter(e => e.id !== id); save(); renderList();
   }
 
   renderList();
